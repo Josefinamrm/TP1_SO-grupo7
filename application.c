@@ -13,9 +13,14 @@
 
 #include <unistd.h>
 #include <stdlib.h>
-#include <select.h>
+#include <sys/select.h>
+#include <string.h>
 
 #define CANTCHILD 5
+#undef max // lo saque de select_tut
+#define max(x, y) ((x) > (y) ? (x) : (y))
+#undef writefd
+#define writefd(x) ((x) + 3)
 
 // Function that exits with code EXIT_FAILURE and displays error message
 void exit_failure(char *message);
@@ -26,14 +31,13 @@ int safe_fork();
 // Function that dups safely
 void safe_dup2(int src_fd, int dest_fd);
 
-// Function that copies one array to another, of the same dimension and of the same type
-void copy_array(int * src, int * dest, int dim);
-
 int main(int argc, char *argv[])
 {
-
-    // lo pongo porlas, capaz después no lo necesito
-    int nfds;
+    fd_set read_fds_set;
+    FD_ZERO(&read_fds_set);
+    int read_fds[CANTCHILD];
+    int nfds = 0;
+    int argv_counter = 1;
 
     for (int i = 0; i < CANTCHILD; i++)
     {
@@ -70,27 +74,46 @@ int main(int argc, char *argv[])
         }
         close(r_pipe[1]);
         close(w_pipe[0]);
+        FD_SET(r_pipe[0], &read_fds_set);
         read_fds[i] = r_pipe[0];
+        nfds = max(nfds, r_pipe[0]);
         // ahora debería de tener
-            // 0 -> tty
-            // 1 -> tty
-            // 2-> tty
-            // 3 -> lectura
-            // 6 -> escritura
-        // acá le mandaría los dos archivos por ejemplo con dos write al w_pipe[1] y decremento argc en 2 
-    }
-    nfds = read_fds[CANTCHILD - 1] + 1;
+        // 0 -> tty
+        // 1 -> tty
+        // 2-> tty
+        // 3 -> lectura
+        // 6 -> escritura
 
-    // mientras hayan archivos por procesar (argc > 0)
-    // select(nfds, copy_read_fds, NULL, NULL, NULL, NULL) = 2 
-    int copy_read_fds[CANTCHILD]; 
-    while(argc > 0){
-        copy_array(read_fds, copy_read_fds, CANTCHILD);
-
+        write(w_pipe[1], argv[argv_counter], strlen(argv[argv_counter++]));
+        write(w_pipe[1], argv[argv_counter], strlen(argv[argv_counter++]));
     }
 
-    // 3 -> write(6)
+    // mientras hayan archivos por procesar (argc > 0) ?
+    // select(nfds+1, copy_read_fds, NULL, NULL, NULL, NULL) = 2
+    fd_set copy_read_fds_set;
+    FD_ZERO(&copy_read_fds_set);
 
+    while (argv_counter != argc)
+    {
+        int result;
+        memcpy(&copy_read_fds_set, &read_fds_set, sizeof(read_fds_set));
+        if ((result = select(nfds + 1, &copy_read_fds_set, NULL, NULL, NULL)) > 0)
+        {
+            for (int i = 0; i < CANTCHILD; i++)
+            {
+                if (FD_ISSET(read_fds[i], &copy_read_fds_set))
+                {
+                    write(writefd(read_fds[i]), argv[argv_counter], strlen(argv[argv_counter++]));
+                    // guardo el resultado del read en el buffer de la shared memory
+                }
+            }
+        }
+        else
+        {
+            perror("select");
+            break;
+        }
+    }
 }
 
 void exit_failure(char *message)
@@ -112,11 +135,5 @@ void safe_dup2(int src_fd, int dest_fd)
     if (dup2(src_fd, dest_fd) == -1)
     {
         exit_failure("dup2");
-    }
-}
-
-void copy_array(int * src, int * dest, int dim){
-    for(int i = 0; i < dim; i++){
-        dest[i] = src[i];
     }
 }
