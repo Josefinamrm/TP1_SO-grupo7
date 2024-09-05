@@ -6,3 +6,72 @@
 
 */
 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#define BUFFER_SIZE 1024
+#define COMMAND_SIZE 2048
+
+void exit_failure(char * message);
+char * safe_fgets(char * buffer, int size, FILE * file);
+FILE * safe_popen(char * command, char * type);
+pid_t safe_getpid();
+
+
+int main(int argc, char * argv[]){
+
+    char buffer[BUFFER_SIZE];
+    ssize_t count;
+    char command_shell[COMMAND_SIZE];
+    char aux[1024];
+
+    while((count = read(STDIN_FILENO, buffer, BUFFER_SIZE)) > 0){
+        buffer[count-1] = '\0';
+        snprintf(command_shell, COMMAND_SIZE, "md5sum -z \"%s\"", buffer);
+
+        FILE *md5 = safe_popen(command_shell, "r");
+
+        char * cmd = safe_fgets(command_shell, COMMAND_SIZE, md5);
+
+        pclose(md5);
+
+        printf("%s\n", command_shell);
+        pid_t pid = safe_getpid();
+        printf("%d\n", pid);
+
+    }
+
+    return 0;
+}
+
+void exit_failure(char * message){
+    perror(message);
+    exit(EXIT_FAILURE);
+}
+
+char * safe_fgets(char * buffer, int size, FILE * file){
+    char * aux = fgets(buffer, size, file);
+    if(aux == NULL){
+        exit_failure("fgets\n");
+    }
+    return aux;
+}
+
+FILE * safe_popen(char * command, char * type){
+    FILE * aux = popen(command, type);
+    if(aux == NULL){
+        exit_failure("popen\n");
+    }
+    return aux;
+}
+
+pid_t safe_getpid(){
+    pid_t aux = getpid();
+    if(aux == -1){
+        exit_failure("getpid\n");
+    }
+    return aux;
+}
