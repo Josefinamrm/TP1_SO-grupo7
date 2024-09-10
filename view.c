@@ -44,13 +44,13 @@ int main(int argc, char * argv[]){ // en el argv[1] tengo el nombre de la shm
         return 1;
     }
 
-    char * ptr = addr;
+    char * ptr = addr; // en addr tengo la direcc de memoria de la shm
 
+    for(int i = 0; i < argc; i++){ // CAMBIAR
 
-    for(int i = 0; i < 5; i++){
-        write(STDOUT_FILENO, addr, st.st_size);
+        write(STDOUT_FILENO, ptr, strlen(ptr)); // imprimo el contenido de la shm
         printf("\n");
-        ptr += strlen(argv[1]) + 1;
+        ptr += (strlen(ptr)+ 1); // avanzo
     }
 
     munmap(addr, st.st_size);
