@@ -1,16 +1,17 @@
-/*
+// /*
 
-- debe recibir el/los paths de los archivos a procesar y debe iniciar el programa correspondiente para procesarlos (md5sum)
-- debe enviar la información relevante del procesamiento al proceso aplicación
-- debe recibir el output de md5sum utilizadno alfun mecanismo de IPC más sofisticado
+// - debe recibir el/los paths de los archivos a procesar y debe iniciar el programa correspondiente para procesarlos (md5sum)
+// - debe enviar la información relevante del procesamiento al proceso aplicación
+// - debe recibir el output de md5sum utilizadno alfun mecanismo de IPC más sofisticado
 
-*/
+// */
 
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
 
 #define BUFFER_SIZE 1024
 #define COMMAND_SIZE 2048
@@ -24,24 +25,27 @@ pid_t safe_getpid();
 int main(int argc, char * argv[]){
 
     char buffer[BUFFER_SIZE];
-    ssize_t count;
     char command_shell[COMMAND_SIZE];
-    char aux[1024];
+    char output[COMMAND_SIZE]; 
 
+
+    ssize_t count;
     while((count = read(STDIN_FILENO, buffer, BUFFER_SIZE)) > 0){
-        buffer[count-1] = '\0';
-        snprintf(command_shell, COMMAND_SIZE, "md5sum -z \"%s\"", buffer);
 
-        FILE *md5 = safe_popen(command_shell, "r");
+            buffer[count-1] = '\0';
 
-        char * cmd = safe_fgets(command_shell, COMMAND_SIZE, md5);
+            snprintf(command_shell, COMMAND_SIZE, "md5sum -z \"%s\"", buffer);
 
-        pclose(md5);
+            FILE *md5 = safe_popen(command_shell, "r");
 
-        printf("%s\n", command_shell);
-        pid_t pid = safe_getpid();
-        printf("%d\n", pid);
+            char * cmd = safe_fgets(command_shell, COMMAND_SIZE, md5);
+            pid_t pid = safe_getpid();
+            snprintf(output, COMMAND_SIZE, "%s\t->\t%d", cmd, pid);
 
+            pclose(md5);
+
+            write(STDOUT_FILENO, output, strlen(output));
+    
     }
 
     return 0;
