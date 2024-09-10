@@ -7,3 +7,76 @@
                 * ID del esclavo que lo procesó
 
 */
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/shm.h>
+#include <unistd.h>
+#include <string.h>
+
+// para la memoria compartida
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+
+int main(int argc, char * argv[]){ // en el argv[1] tengo el nombre de la shm
+
+    int fd;
+    char * addr;
+    struct stat st;
+
+    fd = shm_open(argv[1], O_RDONLY, 0);
+    if(fd == -1){
+        perror("shm_open");
+        return 1;
+    }
+
+    if(fstat(fd, &st) == -1){
+        perror("fstat");
+        return 1;
+    }
+
+    addr = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    if(addr == MAP_FAILED){
+        perror("mmap");
+        return 1;
+    }
+
+    char * ptr = addr;
+
+
+    for(int i = 0; i < 5; i++){
+        write(STDOUT_FILENO, addr, st.st_size);
+        printf("\n");
+        ptr += strlen(argv[1]) + 1;
+    }
+
+    munmap(addr, st.st_size);
+    close(fd);
+
+    return 0;
+}
+
+/* EL CDT DE PRÁCTICA 
+
+READ:
+    sem_wait
+    sem_wait
+    algortimo read
+    sem_post
+
+OPEN:   
+    sem_open
+    sem_open
+    shm_open
+    mmap
+
+CLOSE:
+    unmap
+    sem_close
+    close
+    free
+
+*/
