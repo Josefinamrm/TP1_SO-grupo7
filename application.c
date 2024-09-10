@@ -15,12 +15,16 @@
 #include <stdlib.h>
 #include <sys/select.h>
 #include <string.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <sys/wait.h>
+#include <poll.h>
 
-#define CANTCHILD 5
+
+#define CANTCHILD 1
+#define INITIAL_FILES 2
 #undef max // lo saque de select_tut
 #define max(x, y) ((x) > (y) ? (x) : (y))
-#undef writefd
-#define writefd(x) ((x) + 3)
 
 // Function that exits with code EXIT_FAILURE and displays error message
 void exit_failure(char *message);
@@ -31,80 +35,102 @@ int safe_fork();
 // Function that dups safely
 void safe_dup2(int src_fd, int dest_fd);
 
+// Function that redirects file descriptors
+void redirect_fd(int src_fd, int dest_fd, int fd_close);
+
+
+
+
+
+
 int main(int argc, char *argv[])
 {
+
+    if (argc < 2)
+    {
+        printf("Program must be called with at least one file to analyse\n");
+        exit(EXIT_FAILURE);
+    }
+
+
+    // Variables for file descriptors, used in IPC
     fd_set read_fds_set;
     FD_ZERO(&read_fds_set);
+    // chequear la otra forma para recorrer el fd_set
     int read_fds[CANTCHILD];
+    int write_fds[CANTCHILD];
     int nfds = 0;
-    int argv_counter = 1;
+
+
+    // Make arguments ready for passing
+    argc--;
+    argv++;
+    
 
     for (int i = 0; i < CANTCHILD; i++)
     {
         // Create pipes, one for reading and one for writing
-        int r_pipe[2];
-        int w_pipe[2];
+        int c2p_pipe[2];
+        int p2c_pipe[2];
 
-        if (pipe(r_pipe) == -1 || pipe(w_pipe) == -1)
+        if (pipe(c2p_pipe) == -1 || pipe(p2c_pipe) == -1)
             exit_failure("pipe");
 
         int pid = safe_fork();
         if (pid == 0)
         {
-            // cierro los extremos de los pipes que no voy a usar
-            close(r_pipe[0]);
-            close(w_pipe[1]);
-            // redirijo stdin y stdout a los pipes
-            safe_dup2(r_pipe[1], STDOUT_FILENO);
-            safe_dup2(w_pipe[0], STDIN_FILENO);
-            // cierro los extremos de los pipes ya duplicados
-            close(r_pipe[1]);
-            close(w_pipe[0]);
-            // redirijo stderr ?
+        
+            redirect_fd(c2p_pipe[1], STDOUT_FILENO, c2p_pipe[0]);
+            redirect_fd(p2c_pipe[0], STDIN_FILENO, p2c_pipe[1]);
 
             // ahora debería de tener
-            // 0 -> read end del w_pipe
-            // 1 -> write end del r_pipe
+            // 0 -> read end del p2c_pipe
+            // 1 -> write end del c2p_pipe
             // 2-> tty
 
-            // acá tengo duda de si poner el path así
             char *child_argv[] = {"./slave", NULL};
             execve("./slave", child_argv, NULL);
             exit_failure("execve\n");
         }
-        close(r_pipe[1]);
-        close(w_pipe[0]);
-        FD_SET(r_pipe[0], &read_fds_set);
-        read_fds[i] = r_pipe[0];
-        nfds = max(nfds, r_pipe[0]);
-        // ahora debería de tener
-        // 0 -> tty
-        // 1 -> tty
-        // 2-> tty
-        // 3 -> lectura
-        // 6 -> escritura
 
-        write(w_pipe[1], argv[argv_counter], strlen(argv[argv_counter++]));
-        write(w_pipe[1], argv[argv_counter], strlen(argv[argv_counter++]));
+        close(c2p_pipe[1]);
+        close(p2c_pipe[0]);
+
+        FD_SET(c2p_pipe[0], &read_fds_set);
+        read_fds[i] = c2p_pipe[0];
+        write_fds[i] = p2c_pipe[1];
+
+        nfds = max(nfds, c2p_pipe[0]);
+
+        for(int i = 0; i < INITIAL_FILES; i++, argc--){
+            write(p2c_pipe[1], *argv, strlen(*argv)+1);
+        }
     }
 
-    // mientras hayan archivos por procesar (argc > 0) ?
+
     // select(nfds+1, copy_read_fds, NULL, NULL, NULL, NULL) = 2
     fd_set copy_read_fds_set;
     FD_ZERO(&copy_read_fds_set);
 
-    while (argv_counter != argc)
+    
+
+    // deberia de chequear la condicion de este loop ya que puede que en el interior se deje de cumplir y me rompa el programa
+    while (argc)
     {
         int result;
         memcpy(&copy_read_fds_set, &read_fds_set, sizeof(read_fds_set));
         if ((result = select(nfds + 1, &copy_read_fds_set, NULL, NULL, NULL)) > 0)
         {
-            for (int i = 0; i < CANTCHILD; i++)
+            for (int i = 0; i < CANTCHILD && argc; i++,argv += 1, argc -= 1)
             {
                 if (FD_ISSET(read_fds[i], &copy_read_fds_set))
                 {
-                    write(writefd(read_fds[i]), argv[argv_counter], strlen(argv[argv_counter++]));
-                    // guardo el resultado del read en el buffer de la shared memory
+                    char buffer[1024];
+                    int n = read(read_fds[i], buffer, strlen(buffer));
+                    printf("%s\n", buffer);
+                    memset (buffer, 0, sizeof (buffer));
+                    write(write_fds[i], *argv, strlen(*argv));
+                    write(write_fds[i], "\n", 1);
                 }
             }
         }
@@ -135,5 +161,15 @@ void safe_dup2(int src_fd, int dest_fd)
     if (dup2(src_fd, dest_fd) == -1)
     {
         exit_failure("dup2");
+    }
+}
+
+void redirect_fd(int src_fd, int dest_fd, int fd_close){
+    if(close(fd_close) == -1){
+        exit_failure("close unused fd");
+    }
+    safe_dup2(src_fd, dest_fd);
+    if(close(src_fd) == -1){
+        exit_failure("close");
     }
 }
