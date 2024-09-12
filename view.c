@@ -20,16 +20,11 @@ int main(int argc, char * argv[]){ // en el argv[1] tengo el nombre de la shm
 
     int fd;
     char * addr;
-    struct stat st;
+    struct stat copy;
 
-    sems * sem;
+    semaphore * sem;
 
     
-    // int down = sem_wait(&sem->mutex);
-    // if(down == -1){
-    //     perror("sem_wait");
-    //     return 1;
-    // }    
 
     fd = shm_open(argv[1], O_RDONLY, 0);
     if(fd == -1){
@@ -37,12 +32,12 @@ int main(int argc, char * argv[]){ // en el argv[1] tengo el nombre de la shm
         return 1;
     }
 
-    if(fstat(fd, &st) == -1){
+    if(fstat(fd, &copy) == -1){
         perror("fstat");
         return 1;
     }
 
-    addr = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    addr = mmap(NULL, copy.st_size, PROT_READ, MAP_SHARED, fd, 0);
     if(addr == MAP_FAILED){
         perror("mmap");
         return 1;
@@ -50,44 +45,28 @@ int main(int argc, char * argv[]){ // en el argv[1] tengo el nombre de la shm
 
     char * ptr = addr; // en addr tengo la direcc de memoria de la shm
 
-    for(int i = 0; i < argc; i++){ // CAMBIAR 
+    while(sem_wait(&sem->r)){ // CAMBIAR 
 
+        int down = sem_wait(&sem->mutex);
+        if(down == -1){
+            perror("sem_wait");
+            return 1;
+        }   
         write(STDOUT_FILENO, ptr, strlen(ptr)); // imprimo el contenido de la shm
-        printf("\n");
+        int up = sem_post(&sem->mutex);
+        if(up == -1){
+            perror("sem_wait");
+            return 1;
+        }
+  
         ptr += (strlen(ptr)+ 1); // avanzo
     }
 
-    munmap(addr, st.st_size);
+    munmap(addr, copy.st_size);
 
-    // int up = sem_post(&sem->mutex);
-    // if(up == -1){
-    //     perror("sem_post");
-    //     return 1;
-    // }
 
     close(fd);
 
+
     return 0;
 }
-
-/* EL CDT DE PRÁCTICA 
-
-READ:
-    sem_wait
-    sem_wait
-    algortimo read
-    sem_post
-
-OPEN:   
-    sem_open
-    sem_open
-    shm_open
-    mmap
-
-CLOSE:
-    unmap
-    sem_close
-    close
-    free
-
-*/

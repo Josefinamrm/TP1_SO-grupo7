@@ -1,10 +1,10 @@
-// /*
+/*
 
-// - debe recibir el/los paths de los archivos a procesar y debe iniciar el programa correspondiente para procesarlos (md5sum)
-// - debe enviar la información relevante del procesamiento al proceso aplicación
-// - debe recibir el output de md5sum utilizadno alfun mecanismo de IPC más sofisticado
+- debe recibir el/los paths de los archivos a procesar y debe iniciar el programa correspondiente para procesarlos (md5sum)
+- debe enviar la información relevante del procesamiento al proceso aplicación
+- debe recibir el output de md5sum utilizadno alfun mecanismo de IPC más sofisticado
 
-// */
+*/
 
 
 #include <stdio.h>
@@ -30,22 +30,21 @@ int main(int argc, char * argv[]){
 
 
     ssize_t count;
-    while((count = read(STDIN_FILENO, buffer, BUFFER_SIZE)) > 0){
+    while((count = read(STDIN_FILENO, buffer, BUFFER_SIZE) ) > 0){
 
             buffer[count-1] = '\0';
 
             snprintf(command_shell, COMMAND_SIZE, "md5sum -z \"%s\"", buffer);
 
             FILE *md5 = safe_popen(command_shell, "r");
-
             char * cmd = safe_fgets(command_shell, COMMAND_SIZE, md5);
             pid_t pid = safe_getpid();
-            snprintf(output, COMMAND_SIZE, "%s\t->\t%d", cmd, pid);
+            snprintf(output, COMMAND_SIZE, "%s\t-\t%d\n", cmd, pid);
 
             pclose(md5);
 
             write(STDOUT_FILENO, output, strlen(output));
-    
+
     }
 
     return 0;
@@ -79,3 +78,5 @@ pid_t safe_getpid(){
     }
     return aux;
 }
+
+
