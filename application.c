@@ -124,11 +124,12 @@ int main(int argc, char *argv[])
                     while (!read_flag && (n = read(readable_fds[i].fd, &to_read, 1)) > 0)
                     {
                         // cambiar a \n
-                        if (to_read == '\0')
+                        if (to_read == '\n')
                         {
                             buffer[counter] = '\n';
+                            counter = 0;
                             //  aca seria donde escribe la shared
-                            write(STDOUT_FILENO, buffer, counter + 1);
+                            write(STDOUT_FILENO, buffer, strlen(buffer));
                             fflush(stdout);
                             //
                             read_flag = 1;
