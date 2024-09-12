@@ -22,8 +22,7 @@
 
 #define CANTCHILD 1
 #define INITIAL_FILES 2
-#undef max // lo saque de select_tut
-#define max(x, y) ((x) > (y) ? (x) : (y))
+#define BUFFER_LENGTH 1024
 
 // Function that exits with code EXIT_FAILURE and displays error message
 void exit_failure(char *message);
@@ -43,6 +42,9 @@ void safe_close(int fd);
 // Function that redirects file descriptors
 void redirect_fd(int src_fd, int dest_fd, int fd_close);
 
+// Function that writes to the indicated file descriptor.
+void write_to_fd(int fd, char *string);
+
 int main(int argc, char *argv[])
 {
 
@@ -53,13 +55,13 @@ int main(int argc, char *argv[])
     }
 
     // Variables for file descriptors, used in IPC
-    fd_set read_fds_set;
-    FD_ZERO(&read_fds_set);
-    // chequear la otra forma para recorrer el fd_set
-    // int cant_child = argc <= N ? argc : argc / N ;
-    int read_fds[CANTCHILD];
+    nfds_t open_read_fds = 0;
+    struct pollfd *readable_fds = calloc(CANTCHILD, sizeof(struct pollfd));
+    if (readable_fds == NULL)
+    {
+        exit_failure("calloc");
+    }
     int write_fds[CANTCHILD];
-    int nfds = 0;
 
     // Make arguments ready for passing
     argc--;
@@ -81,10 +83,6 @@ int main(int argc, char *argv[])
             redirect_fd(c2p_pipe[1], STDOUT_FILENO, c2p_pipe[0]);
             redirect_fd(p2c_pipe[0], STDIN_FILENO, p2c_pipe[1]);
 
-            // ahora debería de tener
-            // 0 -> read end del p2c_pipe
-            // 1 -> write end del c2p_pipe
-            // 2-> tty
             char *child_argv[] = {"./slave", NULL};
             execve("./slave", child_argv, NULL);
             exit_failure("execve\n");
@@ -93,86 +91,77 @@ int main(int argc, char *argv[])
         close(c2p_pipe[1]);
         close(p2c_pipe[0]);
 
-        FD_SET(c2p_pipe[0], &read_fds_set);
-        read_fds[i] = c2p_pipe[0];
+        readable_fds[i].fd = c2p_pipe[0];
+        readable_fds[i].events = POLLIN;
+        open_read_fds++;
         write_fds[i] = p2c_pipe[1];
-
-        nfds = max(nfds, c2p_pipe[0]);
 
         for (int i = 0; i < INITIAL_FILES && i <= argc; i++, argc--, argv++)
         {
-            size_t len = strlen(*argv) + 1;
-            char buffer[len];
-            sprintf(buffer, "%s\n", *argv);
-            write(p2c_pipe[1], buffer, len);
+            write_to_fd(p2c_pipe[1], *argv);
         }
     }
 
-    // select(nfds+1, copy_read_fds, NULL, NULL, NULL, NULL) = 2
-    fd_set copy_read_fds_set;
-    FD_ZERO(&copy_read_fds_set);
-
-    /*  zona de lectura  */
-    /* char buf[30];
-    char n;
-    int readB;
-    int counter = 0;
-
-    while ((readB = read(read_fds[0], &n, 1)) > 0 && counter < 30)
-    {
-        if (n == '\0' || counter == 29)
-        {
-            buf[counter] = '\0';
-            printf("%s\n", buf);
-            counter = 0;
-        }
-        else
-        {
-            buf[counter++] = n;
-        }
-    } */
-
-    // deberia de chequear la condicion de este loop ya que puede que en el interior se deje de cumplir y me rompa el programa
     int result;
-    // capaz hay una mejor manera pero por ahora quiero ver si funciona, lo seteo aca el copy
-    memcpy(&copy_read_fds_set, &read_fds_set, sizeof(read_fds_set));
-
-    while ( ... && (result = select(nfds + 1, &copy_read_fds_set, NULL, NULL, NULL)) > 0)
+    while (open_read_fds > 0)
     {
+        result = poll(readable_fds, CANTCHILD, -1);
+        if (result == -1)
+        {
+            exit_failure("poll");
+        }
 
         for (int i = 0; i < CANTCHILD; i++)
         {
-            if (FD_ISSET(read_fds[i], &copy_read_fds_set))
+            if (readable_fds[i].revents != 0)
             {
-                // imprimo en salida estandar lo que me devuelve el slave
-                char to_read[1024];
-                int n = read(read_fds[i], to_read, 1024);
-                if(n == 0){
-                    // eof 
-                    safe_close(read_fds[i]);
-                    FD_CLR(read_fds[i], &read_fds_set);
-                    break;
-                }
-                printf("%s\n", to_read);
-                memset(to_read, 0, sizeof(to_read));
-
-                // le mando otro argumento al hijo, si es que tengo archivos para mandar
-                if (argc)
+                // Data available
+                if (readable_fds[i].revents & POLLIN)
                 {
-                    size_t len = strlen(*argv) + 1;
-                    char buffer[len];
-                    sprintf(buffer, "%s\n", *argv);
-                    write(write_fds[i], buffer, len);
-                    argc -= 1;
-                    argv += 1;
+                    char to_read;
+                    int n, read_flag = 0, counter = 0;
+                    char buffer[BUFFER_LENGTH];
+                    while (!read_flag && (n = read(readable_fds[i].fd, &to_read, 1)) > 0)
+                    {
+                        // cambiar a \n
+                        if (to_read == '\0')
+                        {
+                            buffer[counter] = '\n';
+                            //  aca seria donde escribe la shared
+                            write(STDOUT_FILENO, buffer, counter + 1);
+                            fflush(stdout);
+                            //
+                            read_flag = 1;
+                            // si hay argumentos para mandarle le mando, sino no
+                            if (argc > 0)
+                            {
+                                write_to_fd(write_fds[i], *argv);
+                                argv++;
+                                argc--;
+                            }
+                            else
+                            {
+                                if(write_fds[i] != -1){
+                                    safe_close(write_fds[i]);
+                                    write_fds[i] = -1;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            buffer[counter++] = to_read;
+                        }
+                    }
                 }
-                else{
-                    safe_close(write_fds[i]);
+                // Error or eof
+                else
+                {
+                    safe_close(readable_fds[i].fd);
+                    readable_fds[i].fd = -1;
+                    open_read_fds--;
                 }
             }
         }
-
-        memcpy(&copy_read_fds_set, &read_fds_set, sizeof(read_fds_set));
     }
 }
 
@@ -221,4 +210,12 @@ void redirect_fd(int src_fd, int dest_fd, int fd_close)
     safe_close(fd_close);
     safe_dup2(src_fd, dest_fd);
     safe_close(src_fd);
+}
+
+void write_to_fd(int fd, char *string)
+{
+    size_t len = strlen(string) + 1;
+    char buffer[len];
+    sprintf(buffer, "%s\n", string);
+    write(fd, buffer, len);
 }

@@ -1,36 +1,73 @@
-/*
-
-- debe recibir el/los paths de los archivos a procesar y debe iniciar el programa correspondiente para procesarlos (md5sum)
-- debe enviar la información relevante del procesamiento al proceso aplicación
-- debe recibir el output de md5sum utilizadno alfun mecanismo de IPC más sofisticado
-
-*/
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <string.h>
 
-#define BUF_LENGTH 1024
+#define BUFFER_SIZE 1024
+#define COMMAND_SIZE 2048
 
-int main(void)
-{
-    char buffer[BUF_LENGTH];
-    char toRead;
-    int bytesRead;
-    int counter = 0;
+void exit_failure(char * message);
+char * safe_fgets(char * buffer, int size, FILE * file);
+FILE * safe_popen(char * command, char * type);
+pid_t safe_getpid();
 
-    while((bytesRead = read(STDIN_FILENO, &toRead, 1)) > 0 && counter < BUF_LENGTH){
-        if(toRead == '\0' || counter == BUF_LENGTH-1){
-            buffer[counter] = '\0';
-            write(STDOUT_FILENO, buffer, strlen(buffer)+1);
-            fflush(stdout);
-            counter=0;
-        }else{
-            buffer[counter++] = toRead;
-        }
+
+int main(int argc, char * argv[]){
+
+    char buffer[BUFFER_SIZE];
+    char command_shell[COMMAND_SIZE];
+    char output[COMMAND_SIZE]; 
+
+
+    ssize_t count;
+    while((count = read(STDIN_FILENO, buffer, BUFFER_SIZE) ) > 0){
+
+            buffer[count-1] = '\0';
+
+            snprintf(command_shell, COMMAND_SIZE, "md5sum -z \"%s\"", buffer);
+
+            FILE *md5 = safe_popen(command_shell, "r");
+            char * cmd = safe_fgets(command_shell, COMMAND_SIZE, md5);
+            pid_t pid = safe_getpid();
+            snprintf(output, COMMAND_SIZE, "%s\t-\t%d\n", cmd, pid);
+
+            pclose(md5);
+
+            write(STDOUT_FILENO, output, strlen(output));
+
     }
 
-    exit(EXIT_SUCCESS);
+    return 0;
+}
+
+void exit_failure(char * message){
+    perror(message);
+    exit(EXIT_FAILURE);
+}
+
+char * safe_fgets(char * buffer, int size, FILE * file){
+    char * aux = fgets(buffer, size, file);
+    if(aux == NULL){
+        exit_failure("fgets\n");
+    }
+    return aux;
+}
+
+FILE * safe_popen(char * command, char * type){
+    FILE * aux = popen(command, type);
+    if(aux == NULL){
+        exit_failure("popen\n");
+    }
+    return aux;
+}
+
+pid_t safe_getpid(){
+    pid_t aux = getpid();
+    if(aux == -1){
+        exit_failure("getpid\n");
+    }
+    return aux;
 }
 
 
