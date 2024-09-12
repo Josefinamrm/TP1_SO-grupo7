@@ -20,7 +20,6 @@
 #include <sys/wait.h>
 #include <poll.h>
 
-
 #define CANTCHILD 1
 #define INITIAL_FILES 2
 #undef max // lo saque de select_tut
@@ -35,13 +34,14 @@ int safe_fork();
 // Function that dups safely
 void safe_dup2(int src_fd, int dest_fd);
 
+// Function that creates pipes safely
+void safe_pipe(int pipefd[2]);
+
+// Function that closes file descriptors safely
+void safe_close(int fd);
+
 // Function that redirects file descriptors
 void redirect_fd(int src_fd, int dest_fd, int fd_close);
-
-
-
-
-
 
 int main(int argc, char *argv[])
 {
@@ -52,20 +52,18 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-
     // Variables for file descriptors, used in IPC
     fd_set read_fds_set;
     FD_ZERO(&read_fds_set);
     // chequear la otra forma para recorrer el fd_set
+    // int cant_child = argc <= N ? argc : argc / N ;
     int read_fds[CANTCHILD];
     int write_fds[CANTCHILD];
     int nfds = 0;
 
-
     // Make arguments ready for passing
     argc--;
     argv++;
-    
 
     for (int i = 0; i < CANTCHILD; i++)
     {
@@ -73,13 +71,13 @@ int main(int argc, char *argv[])
         int c2p_pipe[2];
         int p2c_pipe[2];
 
-        if (pipe(c2p_pipe) == -1 || pipe(p2c_pipe) == -1)
-            exit_failure("pipe");
+        safe_pipe(c2p_pipe);
+        safe_pipe(p2c_pipe);
 
         int pid = safe_fork();
         if (pid == 0)
         {
-        
+
             redirect_fd(c2p_pipe[1], STDOUT_FILENO, c2p_pipe[0]);
             redirect_fd(p2c_pipe[0], STDIN_FILENO, p2c_pipe[1]);
 
@@ -87,7 +85,6 @@ int main(int argc, char *argv[])
             // 0 -> read end del p2c_pipe
             // 1 -> write end del c2p_pipe
             // 2-> tty
-
             char *child_argv[] = {"./slave", NULL};
             execve("./slave", child_argv, NULL);
             exit_failure("execve\n");
@@ -102,43 +99,80 @@ int main(int argc, char *argv[])
 
         nfds = max(nfds, c2p_pipe[0]);
 
-        for(int i = 0; i < INITIAL_FILES; i++, argc--){
-            write(p2c_pipe[1], *argv, strlen(*argv)+1);
+        for (int i = 0; i < INITIAL_FILES && i <= argc; i++, argc--, argv++)
+        {
+            size_t len = strlen(*argv) + 1;
+            char buffer[len];
+            sprintf(buffer, "%s\n", *argv);
+            write(p2c_pipe[1], buffer, len);
         }
     }
-
 
     // select(nfds+1, copy_read_fds, NULL, NULL, NULL, NULL) = 2
     fd_set copy_read_fds_set;
     FD_ZERO(&copy_read_fds_set);
 
-    
+    /*  zona de lectura  */
+    /* char buf[30];
+    char n;
+    int readB;
+    int counter = 0;
 
-    // deberia de chequear la condicion de este loop ya que puede que en el interior se deje de cumplir y me rompa el programa
-    while (argc)
+    while ((readB = read(read_fds[0], &n, 1)) > 0 && counter < 30)
     {
-        int result;
-        memcpy(&copy_read_fds_set, &read_fds_set, sizeof(read_fds_set));
-        if ((result = select(nfds + 1, &copy_read_fds_set, NULL, NULL, NULL)) > 0)
+        if (n == '\0' || counter == 29)
         {
-            for (int i = 0; i < CANTCHILD && argc; i++,argv += 1, argc -= 1)
-            {
-                if (FD_ISSET(read_fds[i], &copy_read_fds_set))
-                {
-                    char buffer[1024];
-                    int n = read(read_fds[i], buffer, strlen(buffer));
-                    printf("%s\n", buffer);
-                    memset (buffer, 0, sizeof (buffer));
-                    write(write_fds[i], *argv, strlen(*argv));
-                    write(write_fds[i], "\n", 1);
-                }
-            }
+            buf[counter] = '\0';
+            printf("%s\n", buf);
+            counter = 0;
         }
         else
         {
-            perror("select");
-            break;
+            buf[counter++] = n;
         }
+    } */
+
+    // deberia de chequear la condicion de este loop ya que puede que en el interior se deje de cumplir y me rompa el programa
+    int result;
+    // capaz hay una mejor manera pero por ahora quiero ver si funciona, lo seteo aca el copy
+    memcpy(&copy_read_fds_set, &read_fds_set, sizeof(read_fds_set));
+
+    while ( ... && (result = select(nfds + 1, &copy_read_fds_set, NULL, NULL, NULL)) > 0)
+    {
+
+        for (int i = 0; i < CANTCHILD; i++)
+        {
+            if (FD_ISSET(read_fds[i], &copy_read_fds_set))
+            {
+                // imprimo en salida estandar lo que me devuelve el slave
+                char to_read[1024];
+                int n = read(read_fds[i], to_read, 1024);
+                if(n == 0){
+                    // eof 
+                    safe_close(read_fds[i]);
+                    FD_CLR(read_fds[i], &read_fds_set);
+                    break;
+                }
+                printf("%s\n", to_read);
+                memset(to_read, 0, sizeof(to_read));
+
+                // le mando otro argumento al hijo, si es que tengo archivos para mandar
+                if (argc)
+                {
+                    size_t len = strlen(*argv) + 1;
+                    char buffer[len];
+                    sprintf(buffer, "%s\n", *argv);
+                    write(write_fds[i], buffer, len);
+                    argc -= 1;
+                    argv += 1;
+                }
+                else{
+                    safe_close(write_fds[i]);
+                }
+            }
+        }
+
+        memcpy(&copy_read_fds_set, &read_fds_set, sizeof(read_fds_set));
     }
 }
 
@@ -164,12 +198,27 @@ void safe_dup2(int src_fd, int dest_fd)
     }
 }
 
-void redirect_fd(int src_fd, int dest_fd, int fd_close){
-    if(close(fd_close) == -1){
-        exit_failure("close unused fd");
+void safe_pipe(int pipefd[2])
+{
+    if (pipe(pipefd) == -1)
+    {
+        exit_failure("pipe");
     }
+}
+
+void safe_close(int fd)
+{
+    char message[30];
+    sprintf(message, "close fd %d", fd);
+    if (close(fd) == -1)
+    {
+        exit_failure(message);
+    }
+}
+
+void redirect_fd(int src_fd, int dest_fd, int fd_close)
+{
+    safe_close(fd_close);
     safe_dup2(src_fd, dest_fd);
-    if(close(src_fd) == -1){
-        exit_failure("close");
-    }
+    safe_close(src_fd);
 }
