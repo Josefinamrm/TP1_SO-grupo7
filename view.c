@@ -18,26 +18,22 @@
 
 int main(int argc, char * argv[]){ // en el argv[1] tengo el nombre de la shm
 
-    int fd;
+    int shm_fd;
     char * addr;
     struct stat copy;
 
-    semaphore * sem;
-
-    
-
-    fd = shm_open(argv[1], O_RDONLY, 0);
-    if(fd == -1){
+    shm_fd = shm_open(argv[1], O_RDONLY, 0);
+    if(shm_fd == -1){
         perror("shm_open");
         return 1;
     }
 
-    if(fstat(fd, &copy) == -1){
+    if(fstat(shm_fd, &copy) == -1){
         perror("fstat");
         return 1;
     }
 
-    addr = mmap(NULL, copy.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    addr = mmap(NULL, copy.st_size, PROT_READ, MAP_SHARED, shm_fd, 0);
     if(addr == MAP_FAILED){
         perror("mmap");
         return 1;
@@ -45,27 +41,14 @@ int main(int argc, char * argv[]){ // en el argv[1] tengo el nombre de la shm
 
     char * ptr = addr; // en addr tengo la direcc de memoria de la shm
 
-    while(sem_wait(&sem->r)){ // CAMBIAR 
-
-        int down = sem_wait(&sem->mutex);
-        if(down == -1){
-            perror("sem_wait");
-            return 1;
-        }   
+    for(int i = 0; i < copy.st_size; i++){
         write(STDOUT_FILENO, ptr, strlen(ptr)); // imprimo el contenido de la shm
-        int up = sem_post(&sem->mutex);
-        if(up == -1){
-            perror("sem_wait");
-            return 1;
-        }
-  
         ptr += (strlen(ptr)+ 1); // avanzo
     }
 
     munmap(addr, copy.st_size);
-
-
-    close(fd);
+    shm_unlink(argv[1]);
+    close(shm_fd);
 
 
     return 0;
