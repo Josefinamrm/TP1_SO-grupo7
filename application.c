@@ -127,11 +127,11 @@ int main(int argc, char *argv[])
                         if (to_read == '\n')
                         {
                             buffer[counter] = '\n';
-                            counter = 0;
                             //  aca seria donde escribe la shared
-                            write(STDOUT_FILENO, buffer, strlen(buffer));
+                            write(STDOUT_FILENO, buffer, counter+1);
                             fflush(stdout);
                             //
+                            counter = 0;
                             read_flag = 1;
                             // si hay argumentos para mandarle le mando, sino no
                             if (argc > 0)
