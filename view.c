@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 
 #define SHM_NAME_SIZE  200
+#define BUFFER_LENGTH 1024
 
 int main(int argc, char * argv[]){
 
@@ -23,11 +24,14 @@ int main(int argc, char * argv[]){
     char * addr;
     struct stat copy;
 
+    semaphore * sem = malloc(sizeof(semaphore));
+    sem->can_read = sem_open("can_read", O_CREAT);
+
     char shm_name[SHM_NAME_SIZE]={0};
     // si está en la línea de comandos, el primer argumento 
     if(argc > 1){
         strncpy(shm_name, argv[1], sizeof(shm_name)-1);
-        shm_name[strlen(shm_name) + 1] = '\0';
+        shm_name[strlen(shm_name)] = '\0';
     }
     else{
         // sino, por stdin (pipe)
@@ -35,10 +39,6 @@ int main(int argc, char * argv[]){
         shm_name[count+1] = '\0';
     }
 
-    semaphore * sem = malloc(sizeof(semaphore));
-    sem->mutex = sem_open("mutex", O_CREAT);
-    sem->can_read = sem_open("can_read", O_CREAT);
-    
     shm_fd = shm_open(argv[1], O_RDONLY, 0);
     if(shm_fd == -1){
         perror("shm_open");
@@ -56,20 +56,20 @@ int main(int argc, char * argv[]){
         return 1;
     }
 
-    char * ptr = addr; // en addr tengo la direcc de memoria de la shm
+    char * ptr = addr;
 
-    while(sem_wait(sem->can_read) > -1 ){
-        sem_wait(sem->mutex);
-        write(STDOUT_FILENO, ptr, strlen(ptr)); // imprimo el contenido de la shm
-        sem_post(sem->mutex);
+    while(strcmp(ptr, "EOF") != 0){
+        sem_wait(sem->can_read);
+        write(STDOUT_FILENO, ptr, strlen(ptr));
+        ptr += strlen(ptr)+1;
+        fflush(stdout);
     }
 
+
+
     munmap(addr, copy.st_size);
-    sem_destroy(sem->mutex);
-    sem_destroy(sem->mutex);
     shm_unlink(shm_name);
     close(shm_fd);
-
 
     return 0;
 }

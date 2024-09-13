@@ -25,11 +25,13 @@
 #include <sys/types.h>
 #include <sys/shm.h>
 
+#include "utils.h"
+
 #define CANTCHILD 1
 #define INITIAL_FILES 2
 #define BUFFER_LENGTH 1024
 #define SHM_LENGTH 1024
-// 2048 * 2 =  
+
 // Function that exits with code EXIT_FAILURE and displays error message
 void exit_failure(char *message);
 
@@ -80,6 +82,13 @@ int main(int argc, char *argv[])
     if(shm_ptr == MAP_FAILED){
         exit_failure("mmap");
     }
+
+    semaphore * sem = malloc(sizeof(semaphore));
+    if(sem == NULL){
+        exit_failure("malloc");
+    }
+    sem->can_read = sem_open("can_read", O_CREAT, 0644, 0);
+
 
     // Make arguments ready for passing
     argc--;
@@ -144,14 +153,15 @@ int main(int argc, char *argv[])
                         // cambiar a \n
                         if (to_read == '\n')
                         {
-                            buffer[counter] = '\n';
+                            buffer[counter] = '\0';
                             //  aca seria donde escribe la shared
 
                             memcpy(shm_ptr, buffer, counter+1);
+                            sem_post(sem->can_read);
                             shm_ptr += counter+1;
 
                             //write(STDOUT_FILENO, buffer, counter+1);
-                            fflush(stdout);
+                            //fflush(stdout);
                             
                             counter = 0;
                             read_flag = 1;
@@ -187,6 +197,9 @@ int main(int argc, char *argv[])
         }
     }
 
+    char * eof = "EOF";
+    memcpy(shm_ptr, eof, sizeof(EOF));
+    sem_post(sem->can_read);
     munmap(shm_ptr, SHM_LENGTH);
     close(shm_fd);
 }
