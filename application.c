@@ -10,7 +10,7 @@
 - debe guardar le resultado en el archivo resultado (aparezca el proceso vista o no)
 
 */
-
+#include "utils.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/select.h>
@@ -20,30 +20,16 @@
 #include <sys/wait.h>
 #include <poll.h>
 
-#define CANTCHILD 1
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/shm.h>
+
+#define CANTCHILD 3
 #define INITIAL_FILES 2
 #define BUFFER_LENGTH 1024
+#define SHM_LENGTH 1024
 
-// Function that exits with code EXIT_FAILURE and displays error message
-void exit_failure(char *message);
-
-// Function that forks safely. Returns child fd if succesful, otherwise it ends execution of the program
-int safe_fork();
-
-// Function that dups safely
-void safe_dup2(int src_fd, int dest_fd);
-
-// Function that creates pipes safely
-void safe_pipe(int pipefd[2]);
-
-// Function that closes file descriptors safely
-void safe_close(int fd);
-
-// Function that redirects file descriptors
-void redirect_fd(int src_fd, int dest_fd, int fd_close);
-
-// Function that writes to the indicated file descriptor.
-void write_to_fd(int fd, char *string);
 
 int main(int argc, char *argv[])
 {
@@ -54,6 +40,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+
     // Variables for file descriptors, used in IPC
     nfds_t open_read_fds = 0;
     struct pollfd *readable_fds = calloc(CANTCHILD, sizeof(struct pollfd));
@@ -63,9 +50,28 @@ int main(int argc, char *argv[])
     }
     int write_fds[CANTCHILD];
 
-    // Make arguments ready for passing
+
+    // Variables for shared memory
+    int shm_fd = shm_open("shm", O_CREAT | O_RDWR, 0);
+    if (shm_fd == -1)
+    {
+        exit_failure("shm_open");
+    }
+    if (ftruncate(shm_fd, SHM_LENGTH) == -1)
+    {
+        exit_failure("ftruncate");
+    }
+    void *shm_ptr = mmap(NULL, SHM_LENGTH, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    if (shm_ptr == MAP_FAILED)
+    {
+        exit_failure("mmap");
+    }
+
+
+    // Make cm arguments ready for passing
     argc--;
     argv++;
+
 
     for (int i = 0; i < CANTCHILD; i++)
     {
@@ -79,6 +85,11 @@ int main(int argc, char *argv[])
         int pid = safe_fork();
         if (pid == 0)
         {
+            for (int i = 0; i < open_read_fds; i++)
+            {
+                safe_close(readable_fds[i].fd);
+                safe_close(write_fds[i]);
+            }
 
             redirect_fd(c2p_pipe[1], STDOUT_FILENO, c2p_pipe[0]);
             redirect_fd(p2c_pipe[0], STDIN_FILENO, p2c_pipe[1]);
@@ -102,6 +113,17 @@ int main(int argc, char *argv[])
         }
     }
 
+
+    // Variables for output file
+    FILE *rta_ptr;
+    rta_ptr = fopen("respuesta.txt", "w");
+    if (rta_ptr == NULL)
+    {
+        exit_failure("fopen");
+    }
+
+
+    // Read results
     int result;
     while (open_read_fds > 0)
     {
@@ -123,17 +145,18 @@ int main(int argc, char *argv[])
                     char buffer[BUFFER_LENGTH];
                     while (!read_flag && (n = read(readable_fds[i].fd, &to_read, 1)) > 0)
                     {
-                        // cambiar a \n
                         if (to_read == '\n')
                         {
-                            buffer[counter] = '\n';
-                            counter = 0;
+                            buffer[counter] = '\0';
                             //  aca seria donde escribe la shared
-                            write(STDOUT_FILENO, buffer, strlen(buffer));
-                            fflush(stdout);
-                            //
+
+                            memcpy(shm_ptr, buffer, counter + 1);
+                            shm_ptr += counter + 1;
+
+                            fprintf(rta_ptr, "%s\n", buffer);
+
+                            counter = 0;
                             read_flag = 1;
-                            // si hay argumentos para mandarle le mando, sino no
                             if (argc > 0)
                             {
                                 write_to_fd(write_fds[i], *argv);
@@ -142,7 +165,8 @@ int main(int argc, char *argv[])
                             }
                             else
                             {
-                                if(write_fds[i] != -1){
+                                if (write_fds[i] != -1)
+                                {
                                     safe_close(write_fds[i]);
                                     write_fds[i] = -1;
                                 }
@@ -164,13 +188,13 @@ int main(int argc, char *argv[])
             }
         }
     }
+
+    munmap(shm_ptr, SHM_LENGTH);
+    close(shm_fd);
+    fclose(rta_ptr);
+    exit(EXIT_SUCCESS);
 }
 
-void exit_failure(char *message)
-{
-    perror(message);
-    exit(EXIT_FAILURE);
-}
 
 int safe_fork()
 {
