@@ -18,10 +18,9 @@
 
 
 typedef struct {
-    sem_t mutex; //  = 1 !!!
-    sem_t empty;
-    sem_t full;
-} sems;
+    sem_t * mutex; //  = 1 !!!
+    sem_t * can_read;
+} semaphore;
 
 
 void exit_failure(char * message);

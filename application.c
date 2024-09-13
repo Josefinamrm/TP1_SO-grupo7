@@ -68,6 +68,14 @@ int main(int argc, char *argv[])
     }
 
 
+    // Sempahores
+    semaphore * sem = malloc(sizeof(semaphore));
+    if( sem == NULL ){
+        exit_failure("malloc");
+    }
+    sem->can_read = sem_open("can_read", O_CREAT, 0644, 0);
+
+
     // Make cm arguments ready for passing
     argc--;
     argv++;
@@ -151,6 +159,7 @@ int main(int argc, char *argv[])
                             //  aca seria donde escribe la shared
 
                             memcpy(shm_ptr, buffer, counter + 1);
+                            sem_post(sem->can_read);
                             shm_ptr += counter + 1;
 
                             fprintf(rta_ptr, "%s\n", buffer);
@@ -189,6 +198,11 @@ int main(int argc, char *argv[])
         }
     }
 
+    char * eof = "EOF";
+    memcpy(shm_ptr, eof, sizeof(eof));
+    sem_post(sem->can_read);
+
+
     munmap(shm_ptr, SHM_LENGTH);
     close(shm_fd);
     fclose(rta_ptr);
@@ -196,51 +210,4 @@ int main(int argc, char *argv[])
 }
 
 
-int safe_fork()
-{
-    int pid = fork();
-    if (pid == -1)
-        exit_failure("fork");
-    return pid;
-}
 
-void safe_dup2(int src_fd, int dest_fd)
-{
-    if (dup2(src_fd, dest_fd) == -1)
-    {
-        exit_failure("dup2");
-    }
-}
-
-void safe_pipe(int pipefd[2])
-{
-    if (pipe(pipefd) == -1)
-    {
-        exit_failure("pipe");
-    }
-}
-
-void safe_close(int fd)
-{
-    char message[30];
-    sprintf(message, "close fd %d", fd);
-    if (close(fd) == -1)
-    {
-        exit_failure(message);
-    }
-}
-
-void redirect_fd(int src_fd, int dest_fd, int fd_close)
-{
-    safe_close(fd_close);
-    safe_dup2(src_fd, dest_fd);
-    safe_close(src_fd);
-}
-
-void write_to_fd(int fd, char *string)
-{
-    size_t len = strlen(string) + 1;
-    char buffer[len];
-    sprintf(buffer, "%s\n", string);
-    write(fd, buffer, len);
-}
