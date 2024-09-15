@@ -25,7 +25,7 @@
 #include <sys/types.h>
 #include <sys/shm.h>
 
-#define CANTCHILD 3
+#define CANTCHILD 1
 #define INITIAL_FILES 2
 #define BUFFER_LENGTH 1024
 #define SHM_LENGTH 1024
@@ -52,7 +52,8 @@ int main(int argc, char *argv[])
 
 
     // Variables for shared memory
-    int shm_fd = shm_open("shm", O_CREAT | O_RDWR, 0);
+    char *shm_name = "/shm";
+    int shm_fd = shm_open(shm_name, O_CREAT | O_RDWR, 0);
     if (shm_fd == -1)
     {
         exit_failure("shm_open");
@@ -61,25 +62,23 @@ int main(int argc, char *argv[])
     {
         exit_failure("ftruncate");
     }
-    void *shm_ptr = mmap(NULL, SHM_LENGTH, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    char *shm_ptr = mmap(NULL, SHM_LENGTH, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
     if (shm_ptr == MAP_FAILED)
     {
         exit_failure("mmap");
     }
 
+    char * sem_name = "/can_read";
+    sem_t * can_read = sem_open(sem_name, O_CREAT, 0644, 0);
 
-    // Sempahores
-    semaphore * sem = malloc(sizeof(semaphore));
-    if( sem == NULL ){
-        exit_failure("malloc");
-    }
-    sem->can_read = sem_open("can_read", O_CREAT, 0644, 0);
+    write(STDOUT_FILENO, shm_name, strlen(shm_name));
+    fflush(stdout);
+    sleep(5);
 
 
     // Make cm arguments ready for passing
     argc--;
     argv++;
-
 
     for (int i = 0; i < CANTCHILD; i++)
     {
@@ -98,6 +97,7 @@ int main(int argc, char *argv[])
                 safe_close(readable_fds[i].fd);
                 safe_close(write_fds[i]);
             }
+
 
             redirect_fd(c2p_pipe[1], STDOUT_FILENO, c2p_pipe[0]);
             redirect_fd(p2c_pipe[0], STDIN_FILENO, p2c_pipe[1]);
@@ -156,10 +156,8 @@ int main(int argc, char *argv[])
                         if (to_read == '\n')
                         {
                             buffer[counter] = '\0';
-                            //  aca seria donde escribe la shared
-
                             memcpy(shm_ptr, buffer, counter + 1);
-                            sem_post(sem->can_read);
+                            sem_post(can_read);
                             shm_ptr += counter + 1;
 
                             fprintf(rta_ptr, "%s\n", buffer);
@@ -198,14 +196,16 @@ int main(int argc, char *argv[])
         }
     }
 
-    char * eof = "EOF";
-    memcpy(shm_ptr, eof, sizeof(eof));
-    sem_post(sem->can_read);
+    strcpy(shm_ptr, TERMINATION);
+    //memcpy(shm_ptr, eof, sizeof(eof));
+    sem_post(can_read);
 
 
     munmap(shm_ptr, SHM_LENGTH);
     close(shm_fd);
     fclose(rta_ptr);
+    sem_close(can_read);
+
     exit(EXIT_SUCCESS);
 }
 

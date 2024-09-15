@@ -15,13 +15,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
-
-
-typedef struct {
-    sem_t * mutex; //  = 1 !!!
-    sem_t * can_read;
-} semaphore;
-
+#define TERMINATION "END"
 
 void exit_failure(char * message);
 char * safe_fgets(char * buffer, int size, FILE * file);

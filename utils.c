@@ -33,31 +33,6 @@ pid_t safe_getpid(){
     return aux;
 }
 
-
-char * safe_fgets(char * buffer, int size, FILE * file){
-    char * aux = fgets(buffer, size, file);
-    if(aux == NULL){
-        exit_failure("fgets\n");
-    }
-    return aux;
-}
-
-FILE * safe_popen(char * command, char * type){
-    FILE * aux = popen(command, type);
-    if(aux == NULL){
-        exit_failure("popen\n");
-    }
-    return aux;
-}
-
-pid_t safe_getpid(){
-    pid_t aux = getpid();
-    if(aux == -1){
-        exit_failure("getpid\n");
-    }
-    return aux;
-}
-
 int safe_fork()
 {
     int pid = fork();
@@ -68,6 +43,7 @@ int safe_fork()
 
 void safe_dup2(int src_fd, int dest_fd)
 {
+    printf("%d %d", src_fd, dest_fd);
     if (dup2(src_fd, dest_fd) == -1)
     {
         exit_failure("dup2");

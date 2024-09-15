@@ -24,8 +24,7 @@ int main(int argc, char * argv[]){
     char * addr;
     struct stat copy;
 
-    semaphore * sem = malloc(sizeof(semaphore));
-    sem->can_read = sem_open("can_read", O_CREAT);
+    sem_t * can_read = sem_open("can_read", O_CREAT);
 
     char shm_name[SHM_NAME_SIZE]={0};
     // si está en la línea de comandos, el primer argumento 
@@ -36,10 +35,9 @@ int main(int argc, char * argv[]){
     else{
         // sino, por stdin (pipe)
         size_t count =read(STDIN_FILENO, shm_name, SHM_NAME_SIZE);
-        shm_name[count+1] = '\0';
     }
 
-    shm_fd = shm_open(argv[1], O_RDONLY, 0);
+    shm_fd = shm_open(shm_name, O_RDONLY, 0);
     if(shm_fd == -1){
         perror("shm_open");
         return 1;
@@ -58,9 +56,10 @@ int main(int argc, char * argv[]){
 
     char * ptr = addr;
 
-    while(strcmp(ptr, "EOF") != 0){
-        sem_wait(sem->can_read);
-        write(STDOUT_FILENO, ptr, strlen(ptr));
+
+    while(strcmp(ptr, TERMINATION) != 0){
+        sem_wait(can_read);
+        write_to_fd(STDOUT_FILENO, ptr);
         ptr += strlen(ptr)+1;
         fflush(stdout);
     }
@@ -69,6 +68,7 @@ int main(int argc, char * argv[]){
 
     munmap(addr, copy.st_size);
     shm_unlink(shm_name);
+    sem_destroy(can_read);
     close(shm_fd);
 
     return 0;
