@@ -11,25 +11,10 @@
 
 */
 #include "utils.h"
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/select.h>
-#include <string.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <sys/wait.h>
-#include <poll.h>
-
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/shm.h>
-
-#define CANTCHILD 2
+#define CANTSLAVES 1
 #define INITIAL_FILES 2
 #define BUFFER_LENGTH 1024
 #define SHM_LENGTH 1024
-
 
 int main(int argc, char *argv[])
 {
@@ -40,20 +25,18 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-
     // Variables for file descriptors, used in IPC
     nfds_t open_read_fds = 0;
-    struct pollfd *readable_fds = calloc(CANTCHILD, sizeof(struct pollfd));
+    struct pollfd *readable_fds = calloc(CANTSLAVES, sizeof(struct pollfd));
     if (readable_fds == NULL)
     {
         exit_failure("calloc");
     }
-    int write_fds[CANTCHILD];
+    int write_fds[CANTSLAVES];
 
-
-    // Variables for shared memory
+    // Variables for shared memory, if the view process appears
     char shm_name[SHM_LENGTH] = "/shm";
-    snprintf((char *)shm_name, sizeof(shm_name)-1, "/shm%d", getpid());
+    snprintf((char *)shm_name, sizeof(shm_name) - 1, "/shm%d", getpid());
 
     int shm_fd = shm_open(shm_name, O_CREAT | O_RDWR, 0);
     if (shm_fd == -1)
@@ -70,19 +53,19 @@ int main(int argc, char *argv[])
         exit_failure("mmap");
     }
 
-    char * sem_name = "/can_read";
-    sem_t * can_read = sem_open(sem_name, O_CREAT, 0644, 0);
+    // Semaphore for synchronization between view and application
+    char *sem_name = "/can_read";
+    sem_t *can_read = sem_open(sem_name, O_CREAT, 0644, 0);
 
     write(STDOUT_FILENO, shm_name, strlen(shm_name));
     fflush(stdout);
     sleep(5);
 
-
     // Make cm arguments ready for passing
     argc--;
     argv++;
 
-    for (int i = 0; i < CANTCHILD; i++)
+    for (int i = 0; i < CANTSLAVES; i++)
     {
         // Create pipes, one for reading and one for writing
         int c2p_pipe[2];
@@ -99,7 +82,6 @@ int main(int argc, char *argv[])
                 safe_close(readable_fds[i].fd);
                 safe_close(write_fds[i]);
             }
-
 
             redirect_fd(c2p_pipe[1], STDOUT_FILENO, c2p_pipe[0]);
             redirect_fd(p2c_pipe[0], STDIN_FILENO, p2c_pipe[1]);
@@ -123,7 +105,6 @@ int main(int argc, char *argv[])
         }
     }
 
-
     // Variables for output file
     FILE *rta_ptr;
     rta_ptr = fopen("respuesta.txt", "w");
@@ -132,18 +113,17 @@ int main(int argc, char *argv[])
         exit_failure("fopen");
     }
 
-
     // Read results
     int result;
     while (open_read_fds > 0)
     {
-        result = poll(readable_fds, CANTCHILD, -1);
+        result = poll(readable_fds, CANTSLAVES, -1);
         if (result == -1)
         {
             exit_failure("poll");
         }
 
-        for (int i = 0; i < CANTCHILD; i++)
+        for (int i = 0; i < CANTSLAVES; i++)
         {
             if (readable_fds[i].revents != 0)
             {
@@ -186,7 +166,7 @@ int main(int argc, char *argv[])
                         }
                     }
                 }
-                // Error or eof
+                // Error or EOF
                 else
                 {
                     safe_close(readable_fds[i].fd);
@@ -197,8 +177,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    // QUE DE ALGUNA FORMA AVISAR QUE YA NO HAY MAS INFO EN LA SHARED MEMORY (AACA) !!!!!!!!!!!!!!!!!
-
+    memcpy(shm_ptr, TERMINATION, strlen(TERMINATION) + 1);
+    sem_post(can_read);
 
     munmap(shm_ptr, SHM_LENGTH);
     close(shm_fd);
@@ -206,10 +186,6 @@ int main(int argc, char *argv[])
     sem_close(can_read);
     sem_unlink(sem_name);
     fclose(rta_ptr);
-    
-    
+
     exit(EXIT_SUCCESS);
 }
-
-
-

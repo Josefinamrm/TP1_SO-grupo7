@@ -33,7 +33,7 @@ int main(int argc, char * argv[]){
     }
     else{
         // sino, por stdin (pipe)
-        size_t count =read(STDIN_FILENO, shm_name, SHM_NAME_SIZE);
+        read(STDIN_FILENO, shm_name, SHM_NAME_SIZE);
     }
 
 
@@ -58,12 +58,14 @@ int main(int argc, char * argv[]){
 
     char * ptr = addr;
 
-    while(strcmp(ptr, TERMINATION) != 0){
+    do
+    {
         sem_wait(can_read);
         write_to_fd(STDOUT_FILENO, ptr);
         ptr += strlen(ptr)+1;
         fflush(stdout);
-    }
+    } while (strcmp(ptr, TERMINATION) != 0);
+    
 
 
 

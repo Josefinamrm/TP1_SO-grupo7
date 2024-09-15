@@ -14,6 +14,9 @@
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <poll.h>
+#include <errno.h>
+#include <time.h>
 
 #define TERMINATION "END"
 
