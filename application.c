@@ -11,13 +11,8 @@
 
 */
 #include "utils.h"
-#define CANTSLAVES 1
-#define INITIAL_FILES 2
 #define BUFFER_LENGTH 1024
 #define SHM_LENGTH 1024
-
-
-
 
 int main(int argc, char *argv[]){
 
@@ -26,7 +21,6 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
-
     // Read and Write file descriptors
     nfds_t open_read_fds;
     struct pollfd *readable_fds = calloc(CANTSLAVES, sizeof(struct pollfd));
@@ -34,8 +28,6 @@ int main(int argc, char *argv[]){
         exit_failure("calloc");
     }
     int writeable_fds[CANTSLAVES];
-
-
 
     // Shared memory
     char shm_name[SHM_LENGTH] = "/shm";
@@ -46,84 +38,68 @@ int main(int argc, char *argv[]){
     fflush(stdout);
     sleep(5);
 
-
-
     // Semaphore for synchronization between view and application
     char *sem_name = "can_read";
     sem_t *can_read = sem_open(sem_name, O_CREAT, 0644, 0);
 
-
-
     // Initialize slaves and distribute files
     argc--;
     argv++;
-    open_read_fds = ininitalize_slaves(CANTSLAVES, INITIAL_FILES,  readable_fds, writeable_fds, argv, &argc);
-
-
+    open_read_fds = ininitalize_slaves(readable_fds, writeable_fds, argv, &argc);
 
     // Variables for output file
     FILE *output_file;
     output_file = fopen("respuesta.txt", "w");
-    if (output_file == NULL)
-    {
+    if (output_file == NULL){
         exit_failure("fopen");
     }
 
     // Read results
     int result;
-    while (open_read_fds > 0)
-    {
+    while (open_read_fds > 0){
         result = poll(readable_fds, CANTSLAVES, -1);
+
         if (result == -1){
             exit_failure("poll");
         }
 
-        for (int i = 0; i < CANTSLAVES; i++)
-        {
-            if (readable_fds[i].revents != 0)
-            {
+        for (int i = 0; i < CANTSLAVES; i++){
+            if (readable_fds[i].revents != 0){
                 // Data available
-                if (readable_fds[i].revents & POLLIN)
-                {
+                if (readable_fds[i].revents & POLLIN){
                     char to_read;
                     int n, read_flag = 0, counter = 0;
                     char buffer[BUFFER_LENGTH];
-                    while (!read_flag && (n = read(readable_fds[i].fd, &to_read, 1)) > 0)
-                    {
-                        if (to_read == '\n')
-                        {
+                    
+                    while (!read_flag && (n = read(readable_fds[i].fd, &to_read, 1)) > 0){
+                        if (to_read == '\n'){
                             buffer[counter] = '\0';
-                            memcpy(shm_ptr, buffer, counter + 1);
-                            sem_post(can_read);
+                            write_to_shm(shm_ptr, buffer, counter + 1, can_read);
                             shm_ptr += counter + 1;
 
                             fprintf(output_file, "%s\n", buffer);
                             counter = 0;
                             read_flag = 1;
-                            if (argc > 0)
-                            {
+
+                            if (argc > 0){
                                 write_to_fd(writeable_fds[i], *argv);
                                 argv++;
                                 argc--;
                             }
-                            else
-                            {
-                                if (writeable_fds[i] != -1)
-                                {
+                            else{
+                                if (writeable_fds[i] != -1){
                                     safe_close(writeable_fds[i]);
                                     writeable_fds[i] = -1;
                                 }
                             }
                         }
-                        else
-                        {
+                        else{
                             buffer[counter++] = to_read;
                         }
                     }
                 }
                 // Error or EOF
-                else
-                {
+                else{
                     safe_close(readable_fds[i].fd);
                     readable_fds[i].fd = -1;
                     open_read_fds--;
@@ -132,8 +108,7 @@ int main(int argc, char *argv[]){
         }
     }
 
-    memcpy(shm_ptr, TERMINATION, strlen(TERMINATION) + 1);
-    sem_post(can_read);
+    write_to_shm(shm_ptr, TERMINATION, strlen(TERMINATION) + 1, can_read);
 
     munmap(shm_ptr, SHM_LENGTH);
     shm_unlink(shm_name);

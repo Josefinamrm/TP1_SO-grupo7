@@ -19,6 +19,8 @@
 #include <time.h>
 
 #define TERMINATION "END"
+#define CANTSLAVES 1
+#define INITIAL_FILES 2
 
 
 
@@ -56,18 +58,16 @@ void redirect_fd(int src_fd, int dest_fd, int fd_close);
 void write_to_fd(int fd, char *string);
 
 
+void write_to_shm(char * dest, char * src, size_t size, sem_t * sem);
+
+
 char * initialize_shm(const char * name, off_t shm_size);
 
 
-nfds_t ininitalize_slaves(int cant_slaves, int initial_files, struct pollfd *readable_fds, int * writeable_fds, char ** filenames, int * filenames_qtty);
+nfds_t ininitalize_slaves(struct pollfd *readable_fds, int * writeable_fds, char ** filenames, int * filenames_qtty);
 
 
 
 
-
-
-
-
-/*--------------------------------------------- Shared Memory ---------------------------------------------*/
 
 #endif

@@ -15,8 +15,7 @@
 #define BUFFER_SIZE 1024
 #define COMMAND_SIZE 2048
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]){
 
     char buffer[BUFFER_SIZE];
     char toRead;
@@ -26,10 +25,9 @@ int main(int argc, char *argv[])
     char output[COMMAND_SIZE];
 
     ssize_t count;
-    while ((count = read(STDIN_FILENO, &toRead, 1)) > 0)
-    {
-        if (toRead == '\n')
-        {
+    while ((count = read(STDIN_FILENO, &toRead, 1)) > 0){
+        
+        if (toRead == '\n'){
             buffer[counter] = '\0';
             counter = 0;
 
