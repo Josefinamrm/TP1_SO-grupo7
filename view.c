@@ -21,6 +21,7 @@
 int main(int argc, char * argv[]){
 
     int shm_fd;
+    int data_available = 1;
     char * addr;
     struct stat copy;
 
@@ -58,15 +59,17 @@ int main(int argc, char * argv[]){
 
     char * ptr = addr;
 
-    do
-    {
+    while(data_available){
         sem_wait(can_read);
-        write_to_fd(STDOUT_FILENO, ptr);
-        ptr += strlen(ptr)+1;
-        fflush(stdout);
-    } while (strcmp(ptr, TERMINATION) != 0);
-    
-
+        if(strcmp(ptr, TERMINATION) == 0){
+            data_available = 0;
+        }
+        else{
+            write_to_fd(STDOUT_FILENO, ptr);
+            ptr += strlen(ptr)+1;
+            fflush(stdout);
+        }
+    }
 
 
     munmap(addr, copy.st_size);

@@ -16,42 +16,42 @@
 #define BUFFER_LENGTH 1024
 #define SHM_LENGTH 1024
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]){
 
-    if (argc < 2)
-    {
+    if (argc < 2){
         printf("Program must be called with at least one file to analyse\n");
         exit(EXIT_FAILURE);
     }
 
+
     // Variables for file descriptors, used in IPC
     nfds_t open_read_fds = 0;
     struct pollfd *readable_fds = calloc(CANTSLAVES, sizeof(struct pollfd));
-    if (readable_fds == NULL)
-    {
+    if (readable_fds == NULL){
         exit_failure("calloc");
     }
     int write_fds[CANTSLAVES];
 
-    // Variables for shared memory, if the view process appears
+
+    // Variables for shared memory
     char shm_name[SHM_LENGTH] = "/shm";
     snprintf((char *)shm_name, sizeof(shm_name) - 1, "/shm%d", getpid());
 
     int shm_fd = shm_open(shm_name, O_CREAT | O_RDWR, 0);
-    if (shm_fd == -1)
-    {
+
+    if (shm_fd == -1){
         exit_failure("shm_open");
     }
-    if (ftruncate(shm_fd, SHM_LENGTH) == -1)
-    {
+
+    if (ftruncate(shm_fd, SHM_LENGTH) == -1){
         exit_failure("ftruncate");
     }
+
     char *shm_ptr = mmap(NULL, SHM_LENGTH, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-    if (shm_ptr == MAP_FAILED)
-    {
+    if (shm_ptr == MAP_FAILED){
         exit_failure("mmap");
     }
+    
 
     // Semaphore for synchronization between view and application
     char *sem_name = "/can_read";
@@ -186,6 +186,7 @@ int main(int argc, char *argv[])
     sem_close(can_read);
     sem_unlink(sem_name);
     fclose(rta_ptr);
+    free(readable_fds);
 
     exit(EXIT_SUCCESS);
 }
