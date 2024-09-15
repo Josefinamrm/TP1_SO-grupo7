@@ -15,7 +15,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-#define SHM_NAME_SIZE  200
+#define SHM_NAME_SIZE  256
 #define BUFFER_LENGTH 1024
 
 int main(int argc, char * argv[]){
@@ -24,7 +24,6 @@ int main(int argc, char * argv[]){
     char * addr;
     struct stat copy;
 
-    sem_t * can_read = sem_open("can_read", O_CREAT);
 
     char shm_name[SHM_NAME_SIZE]={0};
     // si está en la línea de comandos, el primer argumento 
@@ -36,6 +35,7 @@ int main(int argc, char * argv[]){
         // sino, por stdin (pipe)
         size_t count =read(STDIN_FILENO, shm_name, SHM_NAME_SIZE);
     }
+
 
     shm_fd = shm_open(shm_name, O_RDONLY, 0);
     if(shm_fd == -1){
@@ -54,8 +54,9 @@ int main(int argc, char * argv[]){
         return 1;
     }
 
-    char * ptr = addr;
+    sem_t * can_read = sem_open("can_read", O_CREAT);
 
+    char * ptr = addr;
 
     while(strcmp(ptr, TERMINATION) != 0){
         sem_wait(can_read);
@@ -67,9 +68,8 @@ int main(int argc, char * argv[]){
 
 
     munmap(addr, copy.st_size);
-    shm_unlink(shm_name);
-    sem_destroy(can_read);
     close(shm_fd);
+    sem_close(can_read);
 
-    return 0;
+    exit(EXIT_SUCCESS);
 }

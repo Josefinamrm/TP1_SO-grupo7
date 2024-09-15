@@ -25,7 +25,7 @@
 #include <sys/types.h>
 #include <sys/shm.h>
 
-#define CANTCHILD 1
+#define CANTCHILD 2
 #define INITIAL_FILES 2
 #define BUFFER_LENGTH 1024
 #define SHM_LENGTH 1024
@@ -52,7 +52,9 @@ int main(int argc, char *argv[])
 
 
     // Variables for shared memory
-    char *shm_name = "/shm";
+    char shm_name[SHM_LENGTH] = "/shm";
+    snprintf((char *)shm_name, sizeof(shm_name)-1, "/shm%d", getpid());
+
     int shm_fd = shm_open(shm_name, O_CREAT | O_RDWR, 0);
     if (shm_fd == -1)
     {
@@ -161,7 +163,6 @@ int main(int argc, char *argv[])
                             shm_ptr += counter + 1;
 
                             fprintf(rta_ptr, "%s\n", buffer);
-
                             counter = 0;
                             read_flag = 1;
                             if (argc > 0)
@@ -196,16 +197,17 @@ int main(int argc, char *argv[])
         }
     }
 
-    strcpy(shm_ptr, TERMINATION);
-    //memcpy(shm_ptr, eof, sizeof(eof));
-    sem_post(can_read);
+    // QUE DE ALGUNA FORMA AVISAR QUE YA NO HAY MAS INFO EN LA SHARED MEMORY (AACA) !!!!!!!!!!!!!!!!!
 
 
     munmap(shm_ptr, SHM_LENGTH);
     close(shm_fd);
-    fclose(rta_ptr);
+    shm_unlink(shm_name);
     sem_close(can_read);
-
+    sem_unlink(sem_name);
+    fclose(rta_ptr);
+    
+    
     exit(EXIT_SUCCESS);
 }
 
