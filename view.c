@@ -26,6 +26,11 @@ int main(int argc, char * argv[]){
     struct stat copy;
 
 
+    char * check_view_name = "check_view";
+    sem_t * check_view_sem = sem_open(check_view_name, O_RDWR);
+    sem_post(check_view_sem);
+
+
     char shm_name[SHM_NAME_SIZE]={0};
     // si está en la línea de comandos, el primer argumento 
     if(argc > 1){
