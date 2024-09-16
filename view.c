@@ -27,9 +27,6 @@ int main(int argc, char * argv[]){
     char * addr;
     struct stat copy;
 
-
-
-
     char shm_name[SHM_NAME_SIZE]={0};
     // si está en la línea de comandos, el primer argumento 
     if(argc > 1){
@@ -58,15 +55,23 @@ int main(int argc, char * argv[]){
         return 1;
     }
 
-    char * check_view_name = "check_view";
-    sem_t * check_view_sem = sem_open(check_view_name, O_CREAT, 0644, 0);
+    char * check_view_name = "/check_view";
+    sem_t * check_view_sem = sem_open(check_view_name, O_CREAT, 0777, 0);
     sem_post(check_view_sem);
 
-    sem_t * can_read = sem_open("can_read", O_CREAT);
+    char * can_read_name = "/can_read";
+    sem_t * can_read_sem = sem_open(can_read_name, O_CREAT, 0777, 0);
+    if(can_read_sem == SEM_FAILED){
+       exit_failure("sem_open");
+    }
+
     char * ptr = addr;
 
+
     while(data_available){
-        sem_wait(can_read);
+
+        sem_wait(can_read_sem);
+
         if(strcmp(ptr, TERMINATION) == 0){
             data_available = 0;
         }
@@ -76,13 +81,12 @@ int main(int argc, char * argv[]){
             fflush(stdout);
         }
     }
-
-
-    munmap(addr, copy.st_size);
+    
     close(shm_fd);
-    sem_close(can_read);
+    sem_close(can_read_sem);
+    sem_unlink(can_read_name);
     sem_close(check_view_sem);
-    /* sem_unlink(check_view_name); */
+    sem_unlink(check_view_name);
 
     exit(EXIT_SUCCESS);
 }

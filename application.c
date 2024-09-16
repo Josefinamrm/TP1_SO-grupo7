@@ -34,8 +34,7 @@ int main(int argc, char *argv[]){
 
 
     // Shared memory
-    char shm_name[SHM_LENGTH] = "/shm";
-    snprintf((char *)shm_name, sizeof(shm_name) - 1, "/shm%d", getpid());
+    char shm_name[] = "/shm_md5";
     char *shm_ptr = initialize_shm(shm_name, SHM_LENGTH);
 
     write(STDOUT_FILENO, shm_name, strlen(shm_name));
@@ -43,13 +42,13 @@ int main(int argc, char *argv[]){
 
 
     // Semaphore for synchronization between view and application
-    char *can_read_name = "can_read";
-    sem_t *can_read_sem = sem_open(can_read_name, O_CREAT, 0644, 0);
+    char *can_read_name = "/can_read";
+    sem_t *can_read_sem = sem_open(can_read_name, O_CREAT, 0777, 0);
 
 
     // Semaphore to check if view process is running
-    char * check_view_name = "check_view";
-    sem_t * check_view_sem = sem_open(check_view_name, O_CREAT, 0644, 0);
+    char * check_view_name = "/check_view";
+    sem_t * check_view_sem = sem_open(check_view_name, O_CREAT, 0777, 0);
 
 
     int view_running = 1, s;
@@ -81,6 +80,7 @@ int main(int argc, char *argv[]){
 
     // Read results
     int result;
+    char * ptr = shm_ptr;
     while (open_read_fds > 0){
         result = poll(readable_fds, CANTSLAVES, -1);
 
@@ -101,8 +101,8 @@ int main(int argc, char *argv[]){
                             buffer[counter] = '\0';
 
                             if(view_running){
-                                write_to_shm(shm_ptr, buffer, counter + 1, can_read_sem);
-                                shm_ptr += counter + 1;
+                                write_to_shm(ptr, buffer, counter + 1, can_read_sem);
+                                ptr += counter + 1;
                             }
 
                             fprintf(output_file, "%s\n", buffer);
@@ -136,9 +136,11 @@ int main(int argc, char *argv[]){
         }
     }
 
-    write_to_shm(shm_ptr, TERMINATION, strlen(TERMINATION) + 1, can_read_sem);
+    write_to_shm(ptr, TERMINATION, strlen(TERMINATION) + 1, can_read_sem);
 
-    munmap(shm_ptr, SHM_LENGTH);
+    if(munmap(shm_ptr, SHM_LENGTH) == -1){
+        exit_failure("fallo munmap de application");
+    };
     shm_unlink(shm_name);
     sem_close(can_read_sem);
     sem_unlink(can_read_name);
