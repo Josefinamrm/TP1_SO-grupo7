@@ -13,7 +13,6 @@
 
 int main(int argc, char * argv[]){
 
-    int shm_fd;
     int data_available = 1;
     char * addr;
 
