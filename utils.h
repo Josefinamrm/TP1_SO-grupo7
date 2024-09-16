@@ -21,7 +21,7 @@
 #define TERMINATION "END"
 #define CANTSLAVES 2
 #define INITIAL_FILES 2
-#define TIME 10
+#define BUFFER_SIZE 1024
 
 
 
@@ -66,9 +66,11 @@ void write_to_shm(char * dest, char * src, size_t size, sem_t * sem);
 
 
 
-/*--------------------------------------------- Application Functions ---------------------------------------------*/
+/*--------------------------------------------- Other Functions ---------------------------------------------*/
 
-char * initialize_shm(const char * name, off_t shm_size);
+char *open_shm_object(const char *name, int open_flags, int map_flags);
+
+char *create_shm_object(const char *name, int open_flags, int map_flags, off_t shm_size);
 
 
 nfds_t ininitalize_slaves(struct pollfd *readable_fds, int * writeable_fds, char ** filenames, int * filenames_qtty);

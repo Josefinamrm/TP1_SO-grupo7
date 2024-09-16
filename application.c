@@ -1,18 +1,9 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-/*
 
-- recibe por lineade comando los archivos a procesar
-- iniciar procesos esclavos
-- distribuir una cierta cantidad (significativsmente menor que el total) de archivos entre los esclavos
-* Cuando un esclavo se libera, la aplicación le debe enviar un nuevo archivo para procesarlo
-- debe recibir el resultado del procesamiento de cada archivo y lo agrefa agregarlo a un buffer por orden de llegada
-- debe esperar 2seg a que aparezca un procesovista
-- termina cuando todos los archivos estén procesados
-- debe guardar le resultado en el archivo resultado (aparezca el proceso vista o no)
 
-*/
 #include "utils.h"
+#define TIME 10
 #define BUFFER_LENGTH 1024
 #define SHM_LENGTH 1024
 
@@ -35,7 +26,7 @@ int main(int argc, char *argv[]){
 
     // Shared memory
     char shm_name[] = "/shm_md5";
-    char *shm_ptr = initialize_shm(shm_name, SHM_LENGTH);
+    char *shm_ptr = create_shm_object(shm_name, O_CREAT | O_RDWR, PROT_READ | PROT_WRITE, SHM_LENGTH);
 
     write(STDOUT_FILENO, shm_name, strlen(shm_name));
     fflush(stdout);

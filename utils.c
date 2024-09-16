@@ -90,19 +90,29 @@ void write_to_shm(char * dest, char * src, size_t size, sem_t * sem){
 }
 
 
-char *initialize_shm(const char *name, off_t shm_size){
+char *aux_shm_object(const char *name, int open_flags, int map_flags, off_t shm_size, int create_object){
 
-    int shm_fd = shm_open(name, O_CREAT | O_RDWR, 0);
+    int shm_fd = shm_open(name, open_flags, 0);
 
     if (shm_fd == -1){
         exit_failure("shm_open");
     }
 
-    if (ftruncate(shm_fd, shm_size) == -1){
-        exit_failure("ftruncate");
+    if(create_object){
+        if (ftruncate(shm_fd, shm_size) == -1){
+            exit_failure("ftruncate");
+        }
+    }
+    else{
+        struct stat copy;
+        if(fstat(shm_fd, &copy) == -1){
+            exit_failure("fstat");
+        }
+        shm_size = copy.st_size;
     }
 
-    char *shm_ptr = mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+
+    char *shm_ptr = mmap(NULL, shm_size, map_flags, MAP_SHARED, shm_fd, 0);
     if (shm_ptr == MAP_FAILED){
         exit_failure("mmap");
     }
@@ -110,6 +120,17 @@ char *initialize_shm(const char *name, off_t shm_size){
     close(shm_fd);
     return shm_ptr;
 }
+
+// Size doesn't matter since it will be overwritten
+char *open_shm_object(const char *name, int open_flags, int map_flags){
+    return aux_shm_object(name, open_flags, map_flags, 0, 0);
+}
+
+
+char *create_shm_object(const char *name, int open_flags, int map_flags, off_t shm_size){
+    return aux_shm_object(name, open_flags, map_flags, shm_size, 1);
+}
+
 
 
 nfds_t ininitalize_slaves(struct pollfd *readable_fds, int *writeable_fds, char **filenames, int *filenames_qtty){

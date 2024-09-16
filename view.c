@@ -1,14 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-/*
 
-- debe recibir por entrada esrpandar y como parámmetro la información decesaria para conectarse al buffer compartido
-- debe mostrar en panrall ael contenido del buffer de llegada a medida que se va cargansoo el mismo. El buffer debe tener:
-                * nombre del archivo
-                * Md5 del archivo
-                * ID del esclavo que lo procesó
-
-*/
 
 
 #include "utils.h"
@@ -19,13 +11,13 @@
 
 #define SHM_NAME_SIZE  256
 #define BUFFER_LENGTH 1024
+#define OPEN 0
 
 int main(int argc, char * argv[]){
 
     int shm_fd;
     int data_available = 1;
     char * addr;
-    struct stat copy;
 
     char shm_name[SHM_NAME_SIZE]={0};
     // si está en la línea de comandos, el primer argumento 
@@ -37,23 +29,7 @@ int main(int argc, char * argv[]){
         read(STDIN_FILENO, shm_name, SHM_NAME_SIZE);
     }
 
-
-    shm_fd = shm_open(shm_name, O_RDONLY, 0);
-    if(shm_fd == -1){
-        perror("shm_open");
-        return 1;
-    }
-
-    if(fstat(shm_fd, &copy) == -1){
-        perror("fstat");
-        return 1;
-    }
-
-    addr = mmap(NULL, copy.st_size, PROT_READ, MAP_SHARED, shm_fd, 0);
-    if(addr == MAP_FAILED){
-        perror("mmap");
-        return 1;
-    }
+    addr = open_shm_object(shm_name, O_RDONLY, PROT_READ);
 
     char * check_view_name = "/check_view";
     sem_t * check_view_sem = sem_open(check_view_name, O_CREAT, 0777, 0);
