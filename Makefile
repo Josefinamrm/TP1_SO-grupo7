@@ -2,7 +2,7 @@
 
 # Variables
 CC = gcc
-CFLAGS = -std=gnu17
+CFLAGS = -std=gnu99
 LDFLAGS = -lrt -lpthread
 
 # Reglas
