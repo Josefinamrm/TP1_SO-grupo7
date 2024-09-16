@@ -6,12 +6,12 @@
 
 int main(int argc, char *argv[]){
 
-    char buffer[BUFFER_SIZE];
+    char buffer[BUFFER_LENGTH];
     char toRead;
     int bytesRead;
     int counter = 0;
-    char command_shell[BUFFER_SIZE];
-    char output[BUFFER_SIZE];
+    char command_shell[BUFFER_LENGTH];
+    char output[BUFFER_LENGTH];
 
     ssize_t count;
     while ((count = read(STDIN_FILENO, &toRead, 1)) > 0){
@@ -20,12 +20,12 @@ int main(int argc, char *argv[]){
             buffer[counter] = '\0';
             counter = 0;
 
-            snprintf(command_shell, BUFFER_SIZE, "md5sum -z \"%s\"", buffer);
+            snprintf(command_shell, BUFFER_LENGTH, "md5sum -z \"%s\"", buffer);
 
             FILE *md5 = safe_popen(command_shell, "r");
-            char *cmd = safe_fgets(command_shell, BUFFER_SIZE, md5);
+            char *cmd = safe_fgets(command_shell, BUFFER_LENGTH, md5);
             pid_t pid = safe_getpid();
-            snprintf(output, BUFFER_SIZE, "%s\t-\t%d\n", cmd, pid);
+            snprintf(output, BUFFER_LENGTH, "%s\t-\t%d\n", cmd, pid);
 
             pclose(md5);
 

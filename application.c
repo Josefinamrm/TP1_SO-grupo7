@@ -4,8 +4,6 @@
 
 #include "utils.h"
 #define TIME 10
-#define BUFFER_LENGTH 1024
-#define SHM_LENGTH 1024
 
 int main(int argc, char *argv[]){
 
@@ -26,7 +24,7 @@ int main(int argc, char *argv[]){
 
     // Shared memory
     char shm_name[] = "/shm_md5";
-    char *shm_ptr = create_shm_object(shm_name, O_CREAT | O_RDWR, PROT_READ | PROT_WRITE, SHM_LENGTH);
+    char *shm_ptr = create_shm_object(shm_name, O_CREAT | O_RDWR, PROT_READ | PROT_WRITE, BUFFER_LENGTH);
 
     write(STDOUT_FILENO, shm_name, strlen(shm_name));
     fflush(stdout);
@@ -129,14 +127,17 @@ int main(int argc, char *argv[]){
 
     write_to_shm(ptr, TERMINATION, strlen(TERMINATION) + 1, can_read_sem);
 
-    if(munmap(shm_ptr, SHM_LENGTH) == -1){
-        exit_failure("fallo munmap de application");
-    };
+
+
+    safe_munmap(shm_ptr, BUFFER_LENGTH);
     shm_unlink(shm_name);
-    sem_close(can_read_sem);
+
+    safe_sem_close(can_read_sem);
     sem_unlink(can_read_name);
-    sem_close(check_view_sem);
+
+    safe_sem_close(check_view_sem);
     sem_unlink(check_view_name);
+
     fclose(output_file);
     free(readable_fds);
 

@@ -68,6 +68,60 @@ void safe_close(int fd){
     }
 }
 
+int safe_shm_open(const char * name, int flag, mode_t mode){
+    int fd_to_return = shm_open(name, flag, mode);
+    if(fd_to_return == -1){
+        exit_failure("shm_open");
+    }
+    return fd_to_return;
+}
+
+
+void safe_ftruncate(int fd, off_t length){
+    if(ftruncate(fd, length) == -1){
+        exit_failure("ftruncate");
+    }
+}
+
+
+void safe_fstat(int fd, struct stat * buf){
+    if(fstat(fd, buf) == -1){
+        exit_failure("fstat");
+    }
+}
+
+
+char * safe_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset){
+    char * ptr_to_return = mmap(addr,len,prot, flags, fd, offset);
+    if(ptr_to_return == MAP_FAILED){
+        exit_failure("mmap");
+    }
+    return ptr_to_return;
+}
+
+
+void safe_munmap(void * addr, size_t len){
+    if(munmap(addr, len) == -1){
+        exit_failure("munmap");
+    }
+}
+
+
+sem_t *  safe_sem_open(char * name){
+    sem_t * sem_to_return = sem_open(name, O_CREAT, 0644, 0);
+    if(sem_to_return == SEM_FAILED){
+        exit_failure("sem_open");
+    }
+    return sem_to_return;
+}
+
+
+void safe_sem_close(sem_t * sem){
+    if(sem_close(sem) == -1){
+        exit_failure("sem_close");
+    }
+}
+
 
 void redirect_fd(int src_fd, int dest_fd, int fd_close){
     safe_close(fd_close);
@@ -92,30 +146,18 @@ void write_to_shm(char * dest, char * src, size_t size, sem_t * sem){
 
 char *aux_shm_object(const char *name, int open_flags, int map_flags, off_t shm_size, int create_object){
 
-    int shm_fd = shm_open(name, open_flags, 0);
-
-    if (shm_fd == -1){
-        exit_failure("shm_open");
-    }
+    int shm_fd = safe_shm_open(name, open_flags, 0);
 
     if(create_object){
-        if (ftruncate(shm_fd, shm_size) == -1){
-            exit_failure("ftruncate");
-        }
+        safe_ftruncate(shm_fd, shm_size);
     }
     else{
         struct stat copy;
-        if(fstat(shm_fd, &copy) == -1){
-            exit_failure("fstat");
-        }
+        safe_fstat(shm_fd, &copy);
         shm_size = copy.st_size;
     }
 
-
-    char *shm_ptr = mmap(NULL, shm_size, map_flags, MAP_SHARED, shm_fd, 0);
-    if (shm_ptr == MAP_FAILED){
-        exit_failure("mmap");
-    }
+    char *shm_ptr = safe_mmap(NULL, shm_size, map_flags, MAP_SHARED, shm_fd, 0);
 
     close(shm_fd);
     return shm_ptr;

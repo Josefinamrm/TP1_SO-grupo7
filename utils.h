@@ -21,7 +21,7 @@
 #define TERMINATION "END"
 #define CANTSLAVES 2
 #define INITIAL_FILES 2
-#define BUFFER_SIZE 1024
+#define BUFFER_LENGTH 1024
 
 
 
@@ -53,6 +53,23 @@ void safe_pipe(int pipefd[2]);
 void safe_close(int fd);
 
 
+int safe_shm_open(const char * name, int flag, mode_t mode);
+
+
+void safe_ftruncate(int fd, off_t length);
+
+
+void safe_fstat(int fd, struct stat * buf);
+
+
+char * safe_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset);
+
+void safe_munmap(void * addr, size_t len);
+
+sem_t *  safe_sem_open(char * name);
+
+void safe_sem_close(sem_t * sem);
+
 
 /*--------------------------------------------- File Descriptor Management ---------------------------------------------*/
 void redirect_fd(int src_fd, int dest_fd, int fd_close);
@@ -68,9 +85,9 @@ void write_to_shm(char * dest, char * src, size_t size, sem_t * sem);
 
 /*--------------------------------------------- Other Functions ---------------------------------------------*/
 
-char *open_shm_object(const char *name, int open_flags, int map_flags);
+char * open_shm_object(const char *name, int open_flags, int map_flags);
 
-char *create_shm_object(const char *name, int open_flags, int map_flags, off_t shm_size);
+char * create_shm_object(const char *name, int open_flags, int map_flags, off_t shm_size);
 
 
 nfds_t ininitalize_slaves(struct pollfd *readable_fds, int * writeable_fds, char ** filenames, int * filenames_qtty);
