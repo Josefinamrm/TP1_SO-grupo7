@@ -26,9 +26,6 @@ int main(int argc, char * argv[]){
     struct stat copy;
 
 
-    char * check_view_name = "check_view";
-    sem_t * check_view_sem = sem_open(check_view_name, O_RDWR);
-    sem_post(check_view_sem);
 
 
     char shm_name[SHM_NAME_SIZE]={0};
@@ -60,8 +57,11 @@ int main(int argc, char * argv[]){
         return 1;
     }
 
-    sem_t * can_read = sem_open("can_read", O_CREAT);
+    char * check_view_name = "check_view";
+    sem_t * check_view_sem = sem_open(check_view_name, O_CREAT, 0644, 0);
+    sem_post(check_view_sem);
 
+    sem_t * can_read = sem_open("can_read", O_CREAT);
     char * ptr = addr;
 
     while(data_available){
@@ -80,6 +80,8 @@ int main(int argc, char * argv[]){
     munmap(addr, copy.st_size);
     close(shm_fd);
     sem_close(can_read);
+    sem_close(check_view_sem);
+    /* sem_unlink(check_view_name); */
 
     exit(EXIT_SUCCESS);
 }
