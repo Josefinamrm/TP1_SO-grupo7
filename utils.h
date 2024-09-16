@@ -21,7 +21,7 @@
 #define TERMINATION "END"
 #define CANTSLAVES 1
 #define INITIAL_FILES 2
-#define TIME 5
+#define TIME 10
 
 
 
@@ -53,6 +53,8 @@ void safe_pipe(int pipefd[2]);
 void safe_close(int fd);
 
 
+
+/*--------------------------------------------- File Descriptor Management ---------------------------------------------*/
 void redirect_fd(int src_fd, int dest_fd, int fd_close);
 
 
@@ -61,6 +63,10 @@ void write_to_fd(int fd, char *string);
 
 void write_to_shm(char * dest, char * src, size_t size, sem_t * sem);
 
+
+
+
+/*--------------------------------------------- Application Functions ---------------------------------------------*/
 
 char * initialize_shm(const char * name, off_t shm_size);
 
