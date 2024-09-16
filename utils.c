@@ -1,4 +1,5 @@
 
+
 #include "utils.h"
 
 
@@ -149,4 +150,6 @@ nfds_t ininitalize_slaves(struct pollfd *readable_fds, int *writeable_fds, char 
     }
 
     return open_read_fds;
+
 }
+

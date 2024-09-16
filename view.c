@@ -1,3 +1,4 @@
+
 /*
 
 - debe recibir por entrada esrpandar y como parámmetro la información decesaria para conectarse al buffer compartido
@@ -80,6 +81,8 @@ int main(int argc, char * argv[]){
     munmap(addr, copy.st_size);
     close(shm_fd);
     sem_close(can_read);
+    sem_close(check_view_sem);
+
 
     exit(EXIT_SUCCESS);
 }

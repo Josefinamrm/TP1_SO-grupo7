@@ -10,7 +10,12 @@
 - debe guardar le resultado en el archivo resultado (aparezca el proceso vista o no)
 
 */
+#define _GNU_SOURCE
 #include "utils.h"
+#include <time.h>
+#include <sys/time.h>
+
+
 #define BUFFER_LENGTH 1024
 #define SHM_LENGTH 1024
 
@@ -140,6 +145,9 @@ int main(int argc, char *argv[]){
     shm_unlink(shm_name);
     sem_close(can_read_sem);
     sem_unlink(can_read_name);
+    sem_close(check_view_sem);
+    sem_unlink(check_view_name);
+
     fclose(output_file);
     free(readable_fds);
 
