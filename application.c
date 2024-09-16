@@ -10,9 +10,6 @@
 - debe guardar le resultado en el archivo resultado (aparezca el proceso vista o no)
 
 */
-
-// This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 #define _GNU_SOURCE
 #include "utils.h"
 #include <time.h>
@@ -21,7 +18,6 @@
 
 #define BUFFER_LENGTH 1024
 #define SHM_LENGTH 1024
-
 
 int main(int argc, char *argv[]){
 
@@ -151,6 +147,7 @@ int main(int argc, char *argv[]){
     sem_unlink(can_read_name);
     sem_close(check_view_sem);
     sem_unlink(check_view_name);
+
     fclose(output_file);
     free(readable_fds);
 
