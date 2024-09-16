@@ -4,22 +4,21 @@
 CC = gcc
 CFLAGS = -std=gnu17
 LDFLAGS = -lrt -lpthread
-SRC = application.c utils.clean
 
 # Reglas
 all: slave app view
 
 
-app: application.c utils.c
-	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@	
-
 slave: slave.c utils.c
-	$(CC) $(CFLAGS) $^ $(LDFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+app: application.c utils.c
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 view: view.c utils.c
-	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 
 clean:
-	rm -f $(OBJ) $(TARGET)
-
+	rm -f slave app view
 .PHONY: all clean
