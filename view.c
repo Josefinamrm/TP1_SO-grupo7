@@ -32,11 +32,11 @@ int main(int argc, char * argv[]){
     addr = open_shm_object(shm_name, O_RDONLY, PROT_READ);
 
     char * check_view_name = "/check_view";
-    sem_t * check_view_sem = sem_open(check_view_name, O_CREAT, 0777, 0);
+    sem_t * check_view_sem = sem_open(check_view_name, O_CREAT, 0644, 0);
     sem_post(check_view_sem);
 
     char * can_read_name = "/can_read";
-    sem_t * can_read_sem = sem_open(can_read_name, O_CREAT, 0777, 0);
+    sem_t * can_read_sem = sem_open(can_read_name, O_CREAT, 0644, 0);
     if(can_read_sem == SEM_FAILED){
        exit_failure("sem_open");
     }
@@ -58,7 +58,6 @@ int main(int argc, char * argv[]){
         }
     }
     
-    close(shm_fd);
     sem_close(can_read_sem);
     sem_unlink(can_read_name);
     sem_close(check_view_sem);
