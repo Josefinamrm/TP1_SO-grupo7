@@ -17,5 +17,5 @@ view: view.c utils.c
 
 clean:
 	rm -f slave app view
-
 .PHONY: all clean
+
