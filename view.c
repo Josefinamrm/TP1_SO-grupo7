@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 /*
 
 - debe recibir por entrada esrpandar y como parámmetro la información decesaria para conectarse al buffer compartido
@@ -32,7 +34,6 @@ int main(int argc, char * argv[]){
     // si está en la línea de comandos, el primer argumento 
     if(argc > 1){
         strncpy(shm_name, argv[1], sizeof(shm_name)-1);
-        shm_name[strlen(shm_name)] = '\0';
     }
     else{
         // sino, por stdin (pipe)

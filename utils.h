@@ -19,7 +19,7 @@
 #include <time.h>
 
 #define TERMINATION "END"
-#define CANTSLAVES 1
+#define CANTSLAVES 2
 #define INITIAL_FILES 2
 #define TIME 10
 
