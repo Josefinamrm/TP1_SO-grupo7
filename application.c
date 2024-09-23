@@ -12,6 +12,9 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
+    char * fifo_name = "/view_pipe";
+    mkfifo(fifo_name, 0666);
+    int fifo_fd = open(fifo_name, O_RDWR);
 
     // Read and Write file descriptors
     nfds_t open_read_fds;
@@ -87,9 +90,10 @@ int main(int argc, char *argv[]){
                     
                     while (!read_flag && (n = read(readable_fds[i].fd, &to_read, 1)) > 0){
                         if (to_read == '\n'){
-                            buffer[counter] = '\0';
+                            buffer[counter] = '\n';
 
                             if(view_running){
+                                write(fifo_fd, buffer, counter + 1);
                                 write_to_shm(ptr, buffer, counter + 1, can_read_sem);
                                 ptr += counter + 1;
                             }
@@ -125,6 +129,7 @@ int main(int argc, char *argv[]){
         }
     }
 
+    close(fifo_fd);
     write_to_shm(ptr, TERMINATION, strlen(TERMINATION) + 1, can_read_sem);
 
 

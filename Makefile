@@ -3,7 +3,7 @@ CC = gcc
 CFLAGS = -std=gnu99 -Wall
 LDFLAGS = -lrt -lpthread
 
-all: slave app view
+all: slave app view2
 
 slave: slave.c utils.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
@@ -11,11 +11,11 @@ slave: slave.c utils.c
 app: application.c utils.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-view: view.c utils.c
+view2: view2.c utils.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 
 clean:
-	rm -f slave app view
+	rm -f slave app view2
 .PHONY: all clean
 
